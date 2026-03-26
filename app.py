@@ -64,6 +64,7 @@ if not os.path.exists(DEFAULTS_FILE):
         {
             "daily": ["underwear", "socks", "t-shirt"],
             "base": ["toothbrush", "toiletries"],
+            "base_sleepover": [],
         },
     )
 
@@ -278,6 +279,27 @@ elif st.session_state.mode == "defaults":
                 save_json(DEFAULTS_FILE, defaults)
                 st.rerun()
 
+    st.markdown("---")
+
+    st.subheader("Base items (only when sleeping over)")
+    for item in list(defaults.get("base_sleepover", [])):
+        col1, col2 = st.columns([0.85, 0.15])
+        col1.write(item)
+        if col2.button("🗑", key=f"del_sleepover_{item}"):
+            defaults["base_sleepover"].remove(item)
+            save_json(DEFAULTS_FILE, defaults)
+            st.rerun()
+
+    with st.form("add_sleepover_form", clear_on_submit=True):
+        new_sleepover = st.text_input("Add sleepover item")
+        if st.form_submit_button("Add sleepover item"):
+            if new_sleepover and new_sleepover not in defaults.get(
+                "base_sleepover", []
+            ):
+                defaults.setdefault("base_sleepover", []).append(new_sleepover)
+                save_json(DEFAULTS_FILE, defaults)
+                st.rerun()
+
 # --- MODULE VIEW ---
 elif st.session_state.current_module_name:
     items = st.session_state.activities[st.session_state.current_module_name]
@@ -327,11 +349,13 @@ else:
         days = st.number_input("Nights", 0, 60, 3)
 
         if st.button("Generate"):
-            items = set(defaults["base"])
+            items = set()
             for a in selected:
                 items.update(st.session_state.activities[a])
 
             if days > 0:
+                items.update(defaults["base"])
+                items.update(defaults.get("base_sleepover", []))
                 clothing = {item: days for item in defaults["daily"]}
                 for k in clothing:
                     items.discard(k)
