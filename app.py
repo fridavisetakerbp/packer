@@ -252,8 +252,8 @@ elif st.session_state.mode == "defaults":
             st.rerun()
 
     with st.form("add_daily_form", clear_on_submit=True):
-        new_daily = st.text_input("Add daily item")
-        if st.form_submit_button("Add daily item"):
+        new_daily = st.text_input("Add nightly item")
+        if st.form_submit_button("Add nightly item"):
             if new_daily and new_daily not in defaults["daily"]:
                 defaults["daily"].append(new_daily)
                 save_json(DEFAULTS_FILE, defaults)
