@@ -80,6 +80,7 @@ for key, default in {
     "current_module_file": None,
     "current_module_name": None,
     "confirm_module_delete": False,
+    "new_module_items": [],
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -115,6 +116,7 @@ if st.sidebar.button("Generate new packing list"):
     st.session_state.packing_list = {}
     st.session_state.current_module_name = None
     st.session_state.current_module_file = None
+    st.session_state.new_module_items = []
     st.rerun()
 
 st.sidebar.markdown("### Existing lists")
@@ -128,6 +130,7 @@ for file in list_saved(SAVE_LIST_DIR):
         st.session_state.mode = "view"
         st.session_state.current_module_name = None
         st.session_state.current_module_file = None
+        st.session_state.new_module_items = []
         st.rerun()
 
 # Delete list
@@ -156,17 +159,14 @@ if st.session_state.current_file:
 st.sidebar.markdown("---")
 st.sidebar.title("My activities")
 
-new_module_name = st.sidebar.text_input("New module name")
-if st.sidebar.button("Create module"):
-    if new_module_name and new_module_name not in st.session_state.activities:
-        st.session_state.activities[new_module_name] = []
-        save_json(os.path.join(SAVE_MODULE_DIR, f"{new_module_name}.json"), [])
-        st.session_state.current_module_name = new_module_name
-        st.session_state.current_module_file = f"{new_module_name}.json"
-        st.session_state.current_file = None
-        st.session_state.current_name = None
-        st.session_state.mode = "generate"
-        st.rerun()
+if st.sidebar.button("Create new module"):
+    st.session_state.mode = "create_module"
+    st.session_state.current_module_name = None
+    st.session_state.current_module_file = None
+    st.session_state.current_file = None
+    st.session_state.current_name = None
+    st.session_state.new_module_items = []
+    st.rerun()
 
 for module in st.session_state.activities:
     if st.sidebar.button(module, key=f"mod_{module}"):
@@ -175,6 +175,7 @@ for module in st.session_state.activities:
         st.session_state.current_file = None
         st.session_state.current_name = None
         st.session_state.mode = "generate"
+        st.session_state.new_module_items = []
         st.rerun()
 
 # --- Defaults ---
@@ -185,10 +186,13 @@ if st.sidebar.button("Edit default items"):
     st.session_state.mode = "defaults"
     st.session_state.current_file = None
     st.session_state.current_module_name = None
+    st.session_state.new_module_items = []
     st.rerun()
 
 # --- TITLE ---
-if st.session_state.current_module_name:
+if st.session_state.mode == "create_module":
+    st.title("Module Generator")
+elif st.session_state.current_module_name:
     st.title(st.session_state.current_module_name)
 elif st.session_state.mode == "view" and st.session_state.current_name:
     st.title(st.session_state.current_name)
@@ -197,8 +201,47 @@ elif st.session_state.mode == "defaults":
 else:
     st.title("Packing List Generator")
 
+# --- MODULE GENERATOR ---
+if st.session_state.mode == "create_module":
+    module_name = st.text_input("Module name")
+
+    st.subheader("Items")
+    for i, item in enumerate(list(st.session_state.new_module_items)):
+        col1, col2 = st.columns([0.85, 0.15])
+        col1.write(item)
+        if col2.button("🗑", key=f"del_new_mod_{i}"):
+            st.session_state.new_module_items.remove(item)
+            st.rerun()
+
+    with st.form("add_new_module_item_form", clear_on_submit=True):
+        new_item = st.text_input("Add item")
+        if st.form_submit_button("Add"):
+            if new_item and new_item not in st.session_state.new_module_items:
+                st.session_state.new_module_items.append(new_item)
+                st.rerun()
+
+    st.markdown("---")
+    if st.button("Create module"):
+        if not module_name:
+            st.error("Please enter a module name.")
+        elif module_name in st.session_state.activities:
+            st.error(f"A module named '{module_name}' already exists.")
+        else:
+            st.session_state.activities[module_name] = list(
+                st.session_state.new_module_items
+            )
+            save_json(
+                os.path.join(SAVE_MODULE_DIR, f"{module_name}.json"),
+                st.session_state.new_module_items,
+            )
+            st.session_state.current_module_name = module_name
+            st.session_state.current_module_file = f"{module_name}.json"
+            st.session_state.new_module_items = []
+            st.session_state.mode = "generate"
+            st.rerun()
+
 # --- DEFAULTS EDITOR ---
-if st.session_state.mode == "defaults":
+elif st.session_state.mode == "defaults":
     st.subheader("Daily items (scaled with days)")
     for item in list(defaults["daily"]):
         col1, col2 = st.columns([0.85, 0.15])
@@ -208,12 +251,13 @@ if st.session_state.mode == "defaults":
             save_json(DEFAULTS_FILE, defaults)
             st.rerun()
 
-    new_daily = st.text_input("Add daily item")
-    if st.button("Add daily item"):
-        if new_daily and new_daily not in defaults["daily"]:
-            defaults["daily"].append(new_daily)
-            save_json(DEFAULTS_FILE, defaults)
-            st.rerun()
+    with st.form("add_daily_form", clear_on_submit=True):
+        new_daily = st.text_input("Add daily item")
+        if st.form_submit_button("Add daily item"):
+            if new_daily and new_daily not in defaults["daily"]:
+                defaults["daily"].append(new_daily)
+                save_json(DEFAULTS_FILE, defaults)
+                st.rerun()
 
     st.markdown("---")
 
@@ -226,12 +270,13 @@ if st.session_state.mode == "defaults":
             save_json(DEFAULTS_FILE, defaults)
             st.rerun()
 
-    new_base = st.text_input("Add base item")
-    if st.button("Add base item"):
-        if new_base and new_base not in defaults["base"]:
-            defaults["base"].append(new_base)
-            save_json(DEFAULTS_FILE, defaults)
-            st.rerun()
+    with st.form("add_base_form", clear_on_submit=True):
+        new_base = st.text_input("Add base item")
+        if st.form_submit_button("Add base item"):
+            if new_base and new_base not in defaults["base"]:
+                defaults["base"].append(new_base)
+                save_json(DEFAULTS_FILE, defaults)
+                st.rerun()
 
 # --- MODULE VIEW ---
 elif st.session_state.current_module_name:
@@ -246,12 +291,13 @@ elif st.session_state.current_module_name:
             autosave_module()
             st.rerun()
 
-    new_item = st.text_input("Add item")
-    if st.button("Add to module"):
-        if new_item and new_item not in items:
-            items.append(new_item)
-            autosave_module()
-            st.rerun()
+    with st.form("add_to_module_form", clear_on_submit=True):
+        new_item = st.text_input("Add item")
+        if st.form_submit_button("Add to module"):
+            if new_item and new_item not in items:
+                items.append(new_item)
+                autosave_module()
+                st.rerun()
 
     st.markdown("---")
     if not st.session_state.confirm_module_delete:
@@ -324,23 +370,25 @@ else:
                     st.rerun()
 
         st.markdown("---")
-        new_item = st.text_input("Add custom item")
-        if st.button("Add item"):
-            if new_item:
-                st.session_state.packing_list[new_item] = False
-                autosave_list()
-                st.rerun()
+        with st.form("add_custom_item_form", clear_on_submit=True):
+            new_item = st.text_input("Add custom item")
+            if st.form_submit_button("Add item"):
+                if new_item:
+                    st.session_state.packing_list[new_item] = False
+                    autosave_list()
+                    st.rerun()
 
         if st.session_state.mode == "generate":
             st.markdown("---")
-            name = st.text_input("Save as")
-            if st.button("Save"):
-                if name:
-                    save_json(
-                        os.path.join(SAVE_LIST_DIR, f"{name}.json"),
-                        st.session_state.packing_list,
-                    )
-                    st.session_state.current_file = f"{name}.json"
-                    st.session_state.current_name = name
-                    st.session_state.mode = "view"
-                    st.success("Saved")
+            with st.form("save_list_form"):
+                name = st.text_input("Save as")
+                if st.form_submit_button("Save"):
+                    if name:
+                        save_json(
+                            os.path.join(SAVE_LIST_DIR, f"{name}.json"),
+                            st.session_state.packing_list,
+                        )
+                        st.session_state.current_file = f"{name}.json"
+                        st.session_state.current_name = name
+                        st.session_state.mode = "view"
+                        st.success("Saved")
