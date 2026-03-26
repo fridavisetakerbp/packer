@@ -1,6 +1,7 @@
-import streamlit as st
-import os
 import json
+import os
+
+import streamlit as st
 
 # --- Config ---
 st.set_page_config(page_title="Packing List", layout="centered")
@@ -13,29 +14,39 @@ os.makedirs(SAVE_LIST_DIR, exist_ok=True)
 os.makedirs(SAVE_MODULE_DIR, exist_ok=True)
 
 # --- Styling ---
-st.markdown("""
+st.markdown(
+    """
 <style>
 .stApp { background-color: #ffe4ec; }
 .packed-item { color: #b0b0b0; text-decoration: line-through; }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
+
 
 # --- Helpers ---
 def save_json(path, data):
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
 
+
 def load_json(path):
     with open(path, "r") as f:
         return json.load(f)
 
+
 def list_saved(path):
     return sorted([f for f in os.listdir(path) if f.endswith(".json")])
+
 
 def autosave_list():
     if st.session_state.current_file:
         name = st.session_state.current_file.replace(".json", "")
-        save_json(os.path.join(SAVE_LIST_DIR, f"{name}.json"), st.session_state.packing_list)
+        save_json(
+            os.path.join(SAVE_LIST_DIR, f"{name}.json"), st.session_state.packing_list
+        )
+
 
 def autosave_module():
     if st.session_state.current_module_file:
@@ -45,12 +56,16 @@ def autosave_module():
             st.session_state.activities[st.session_state.current_module_name],
         )
 
+
 # --- Initialize defaults ---
 if not os.path.exists(DEFAULTS_FILE):
-    save_json(DEFAULTS_FILE, {
-        "daily": ["underwear", "socks", "t-shirt"],
-        "base": ["toothbrush", "toiletries"]
-    })
+    save_json(
+        DEFAULTS_FILE,
+        {
+            "daily": ["underwear", "socks", "t-shirt"],
+            "base": ["toothbrush", "toiletries"],
+        },
+    )
 
 defaults = load_json(DEFAULTS_FILE)
 
@@ -184,7 +199,6 @@ else:
 
 # --- DEFAULTS EDITOR ---
 if st.session_state.mode == "defaults":
-
     st.subheader("Daily items (scaled with days)")
     for item in list(defaults["daily"]):
         col1, col2 = st.columns([0.85, 0.15])
@@ -221,7 +235,6 @@ if st.session_state.mode == "defaults":
 
 # --- MODULE VIEW ---
 elif st.session_state.current_module_name:
-
     items = st.session_state.activities[st.session_state.current_module_name]
 
     st.subheader("Items")
@@ -248,7 +261,9 @@ elif st.session_state.current_module_name:
         st.warning("Are you sure you want to delete this module?")
         col1, col2 = st.columns(2)
         if col1.button("Yes delete module"):
-            os.remove(os.path.join(SAVE_MODULE_DIR, st.session_state.current_module_file))
+            os.remove(
+                os.path.join(SAVE_MODULE_DIR, st.session_state.current_module_file)
+            )
             del st.session_state.activities[st.session_state.current_module_name]
             st.session_state.current_module_name = None
             st.session_state.current_module_file = None
@@ -259,9 +274,10 @@ elif st.session_state.current_module_name:
 
 # --- PACKING LIST ---
 else:
-
     if st.session_state.mode == "generate":
-        selected = st.multiselect("Activities", list(st.session_state.activities.keys()))
+        selected = st.multiselect(
+            "Activities", list(st.session_state.activities.keys())
+        )
         days = st.number_input("Days", 1, 60, 3)
 
         if st.button("Generate"):
@@ -278,7 +294,6 @@ else:
             st.session_state.packing_list = {i: False for i in full}
 
     if st.session_state.packing_list:
-
         st.subheader("To pack")
         for item, packed in list(st.session_state.packing_list.items()):
             if not packed:
@@ -298,7 +313,11 @@ else:
         for item, packed in list(st.session_state.packing_list.items()):
             if packed:
                 col1, col2 = st.columns([0.85, 0.15])
-                col1.markdown(f"<div class='packed-item'>☑ {item}</div>", unsafe_allow_html=True)
+                with col1:
+                    if not st.checkbox(item, value=True, key=f"chk_packed_{item}"):
+                        st.session_state.packing_list[item] = False
+                        autosave_list()
+                        st.rerun()
                 if col2.button("🗑", key=f"del_p_{item}"):
                     del st.session_state.packing_list[item]
                     autosave_list()
@@ -317,7 +336,10 @@ else:
             name = st.text_input("Save as")
             if st.button("Save"):
                 if name:
-                    save_json(os.path.join(SAVE_LIST_DIR, f"{name}.json"), st.session_state.packing_list)
+                    save_json(
+                        os.path.join(SAVE_LIST_DIR, f"{name}.json"),
+                        st.session_state.packing_list,
+                    )
                     st.session_state.current_file = f"{name}.json"
                     st.session_state.current_name = name
                     st.session_state.mode = "view"
