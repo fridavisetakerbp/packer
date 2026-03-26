@@ -242,7 +242,7 @@ if st.session_state.mode == "create_module":
 
 # --- DEFAULTS EDITOR ---
 elif st.session_state.mode == "defaults":
-    st.subheader("Daily items (scaled with days)")
+    st.subheader("Nightly items (scaled with nights)")
     for item in list(defaults["daily"]):
         col1, col2 = st.columns([0.85, 0.15])
         col1.write(item)
@@ -324,7 +324,7 @@ else:
         selected = st.multiselect(
             "Activities", list(st.session_state.activities.keys())
         )
-        days = st.number_input("Days", 1, 60, 3)
+        days = st.number_input("Nights", 0, 60, 3)
 
         if st.button("Generate"):
             items = set(defaults["base"])
