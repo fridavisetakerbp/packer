@@ -331,12 +331,13 @@ else:
             for a in selected:
                 items.update(st.session_state.activities[a])
 
-            clothing = {item: days for item in defaults["daily"]}
-
-            for k in clothing:
-                items.discard(k)
-
-            full = [f"{k} x{v}" for k, v in clothing.items()] + sorted(items)
+            if days > 0:
+                clothing = {item: days for item in defaults["daily"]}
+                for k in clothing:
+                    items.discard(k)
+                full = [f"{k} x{v}" for k, v in clothing.items()] + sorted(items)
+            else:
+                full = sorted(items)
             st.session_state.packing_list = {i: False for i in full}
 
     if st.session_state.packing_list:
