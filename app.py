@@ -63,8 +63,8 @@ if not os.path.exists(DEFAULTS_FILE):
         DEFAULTS_FILE,
         {
             "daily": ["underwear", "socks", "t-shirt"],
-            "base": ["toothbrush", "toiletries"],
-            "base_sleepover": [],
+            "base": ["phone", "wallet", "keys"],
+            "base_sleepover": ["toothbrush", "toiletries", "glasses"],
         },
     )
 
@@ -350,11 +350,11 @@ else:
 
         if st.button("Generate"):
             items = set()
+            items.update(defaults["base"])
             for a in selected:
                 items.update(st.session_state.activities[a])
 
             if days > 0:
-                items.update(defaults["base"])
                 items.update(defaults.get("base_sleepover", []))
                 clothing = {item: days for item in defaults["daily"]}
                 for k in clothing:
