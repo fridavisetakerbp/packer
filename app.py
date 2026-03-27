@@ -56,6 +56,12 @@ def autosave_module():
             st.session_state.activities[st.session_state.current_module_name],
         )
 
+def rename_file(old_path, new_path):
+    if os.path.exists(old_path):
+        os.rename(old_path, new_path)
+
+def safe_name(name):
+    return name.strip().replace("/", "_")
 
 # --- Initialize defaults ---
 if not os.path.exists(DEFAULTS_FILE):
@@ -138,6 +144,26 @@ for file in list_saved(SAVE_LIST_DIR):
 if st.session_state.current_file:
     st.sidebar.markdown("---")
     st.sidebar.write(f"Selected: {st.session_state.current_name}")
+
+    new_name = st.sidebar.text_input(
+        "Rename list", value=st.session_state.current_name, key="rename_list_input"
+    )
+
+    if st.sidebar.button("Rename list"):
+        new_name = safe_name(new_name)
+        new_file = f"{new_name}.json"
+
+        if new_file in list_saved(SAVE_LIST_DIR):
+            st.sidebar.error("Name already exists")
+        elif new_name != st.session_state.current_name:
+            old_path = os.path.join(SAVE_LIST_DIR, st.session_state.current_file)
+            new_path = os.path.join(SAVE_LIST_DIR, new_file)
+
+            rename_file(old_path, new_path)
+
+            st.session_state.current_file = new_file
+            st.session_state.current_name = new_name
+            st.rerun()
 
     if not st.session_state.confirm_delete:
         if st.sidebar.button("Delete list"):
@@ -303,6 +329,33 @@ elif st.session_state.mode == "defaults":
 # --- MODULE VIEW ---
 elif st.session_state.current_module_name:
     items = st.session_state.activities[st.session_state.current_module_name]
+    # --- Rename module ---
+    current_name = st.session_state.current_module_name
+
+    new_module_name = st.text_input(
+        "Rename module", value=current_name, key="rename_module_input"
+    )
+
+    if st.button("Rename module"):
+        new_module_name = safe_name(new_module_name)
+
+        if new_module_name in st.session_state.activities:
+            st.error("Module already exists")
+        elif new_module_name != current_name:
+            old_file = os.path.join(SAVE_MODULE_DIR, f"{current_name}.json")
+            new_file = os.path.join(SAVE_MODULE_DIR, f"{new_module_name}.json")
+
+            rename_file(old_file, new_file)
+
+            # rename dict key
+            st.session_state.activities[new_module_name] = \
+                st.session_state.activities.pop(current_name)
+
+            # update session refs
+            st.session_state.current_module_name = new_module_name
+            st.session_state.current_module_file = f"{new_module_name}.json"
+
+            st.rerun()
 
     st.subheader("Items")
     for item in list(items):
