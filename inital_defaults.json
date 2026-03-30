@@ -1,0 +1,38 @@
+{
+  "daily": [
+    "underwear",
+    "socks",
+    "t-shirt",
+    "contacts"
+  ],
+  "base": [
+    "phone",
+    "wallet",
+    "keys",
+    "lipbalm",
+    "hairtie",
+    "tote bag",
+    "hand cream"
+  ],
+  "base_sleepover": [
+    "toothbrush",
+    "glasses",
+    "antibiotics",
+    "paracetamol",
+    "pads",
+    "pajamas",
+    "earplugs",
+    "eyemask",
+    "toothpaste",
+    "tweezers",
+    "nailcutters",
+    "comb",
+    "hair oil",
+    "sunblock",
+    "face cream",
+    "deodorant",
+    "razor",
+    "phone charger",
+    "garmin watch charger"
+  ]
+}

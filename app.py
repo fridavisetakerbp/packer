@@ -9,6 +9,9 @@ st.set_page_config(page_title="Packing List", layout="centered")
 SAVE_LIST_DIR = "packing_lists"
 SAVE_MODULE_DIR = "activity_modules"
 DEFAULTS_FILE = "defaults.json"
+INITIAL_LISTS_DIR = "initial_lists"
+INITIAL_MODULE_DIR = "initial_modules"
+INITIAL_DEFAULTS_FILE = "initial_defaults.json"
 
 os.makedirs(SAVE_LIST_DIR, exist_ok=True)
 os.makedirs(SAVE_MODULE_DIR, exist_ok=True)
@@ -67,11 +70,7 @@ def safe_name(name):
 if not os.path.exists(DEFAULTS_FILE):
     save_json(
         DEFAULTS_FILE,
-        {
-            "daily": ["underwear", "socks", "t-shirt"],
-            "base": ["phone", "wallet", "keys"],
-            "base_sleepover": ["toothbrush", "toiletries", "glasses"],
-        },
+        load_json(os.path.join(INITIAL_DEFAULTS_FILE)),
     )
 
 defaults = load_json(DEFAULTS_FILE)
@@ -93,18 +92,13 @@ for key, default in {
         st.session_state[key] = default
 
 # --- Default modules ---
-DEFAULT_MODULES = {
-    "Running": ["running shoes", "sports socks", "shorts", "t-shirt"],
-    "Swimming": ["swimsuit", "towel", "flip flops"],
-    "Hiking": ["hiking boots", "backpack", "water bottle", "jacket"],
-    "Sleeping": ["pajamas"],
-    "Work meetings": ["formal shirt", "formal pants", "belt", "dress shoes"],
-    "Coding sessions": ["laptop", "charger", "notebook"],
-    "Dinner out": ["nice outfit", "casual shoes"],
-}
+INITIAL_MODULES = {}
+for f in list_saved(INITIAL_MODULE_DIR):
+    name = f.replace(".json", "")
+    INITIAL_MODULES[name] = load_json(os.path.join(INITIAL_MODULE_DIR, f))
 
 if not os.listdir(SAVE_MODULE_DIR):
-    for k, v in DEFAULT_MODULES.items():
+    for k, v in INITIAL_MODULES.items():
         save_json(os.path.join(SAVE_MODULE_DIR, f"{k}.json"), v)
 
 # Load modules
