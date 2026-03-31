@@ -1,42 +1,92 @@
 import json
 import os
+import tomllib
 
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
 
+
 def get_firebase_cred():
-
-    # Case 2: Local development
-    if os.path.exists(r"C:\Users\frivis\OneDrive - Aker BP\Documents\Projects\packing_app\packer\cloud_credentials.json"):
+    if os.path.exists("cloud_credentials.json"):
         return credentials.Certificate("cloud_credentials.json")
-
-    # Case 1: Running on Streamlit Cloud
     if "firebase" in st.secrets:
         return credentials.Certificate(dict(st.secrets["firebase"]))
-    
-    else:
-        raise RuntimeError("No Firebase credentials found")
+    raise RuntimeError("No Firebase credentials found")
+
+
+def get_passwords():
+    if os.path.exists("passwords.toml"):
+        with open("passwords.toml", "rb") as f:
+            return tomllib.load(f)["passwords"]
+    return dict(st.secrets["passwords"])
+
 
 # --- Firebase Setup ---
-if not firebase_admin._apps:  # check if Firebase app is already initialized
+if not firebase_admin._apps:
     cred = get_firebase_cred()
     firebase_admin.initialize_app(cred)
-    
+
 db = firestore.client()
 
 # --- Config ---
 st.set_page_config(page_title="Packing List", layout="centered")
 
 INITIAL_DATA_FILE = "initial_data.json"
-DATA_DOC = db.collection("app_data").document("user_data")
+
+# --- User Configuration ---
+# To add a user: add an entry here + a matching password in passwords.toml / st.secrets
+USERS = {
+    "Alice": {"color": "#ffe4ec", "icon": "🎀"},
+    "Bob": {"color": "#d4e8ff", "icon": "🌊"},
+    "Charlie": {"color": "#d4f5d4", "icon": "🌿"},
+    "Diana": {"color": "#fff0d4", "icon": "🌅"},
+}
+
+# --- Authentication ---
+for _key, _default in {"selected_user": None, "authenticated": False}.items():
+    if _key not in st.session_state:
+        st.session_state[_key] = _default
+
+if not st.session_state.authenticated:
+    st.markdown(
+        '<style>.stApp { background-color: #f0f0f5; }</style>',
+        unsafe_allow_html=True,
+    )
+    if not st.session_state.selected_user:
+        st.title("Welcome! 👋")
+        st.write("Choose your profile:")
+        for _user, _cfg in USERS.items():
+            if st.button(f"{_cfg['icon']} {_user}", key=f"select_{_user}"):
+                st.session_state.selected_user = _user
+                st.rerun()
+    else:
+        _user = st.session_state.selected_user
+        _cfg = USERS[_user]
+        st.title(f"{_cfg['icon']} {_user}")
+        _pw = st.text_input("Password", type="password")
+        if _pw:
+            _passwords = get_passwords()
+            if _pw == _passwords.get(_user):
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("Wrong password")
+        if st.button("← Back"):
+            st.session_state.selected_user = None
+            st.rerun()
+    st.stop()
+
+# --- Authenticated: set up user context ---
+user_config = USERS[st.session_state.selected_user]
+DATA_DOC = db.collection("app_data").document(st.session_state.selected_user)
 
 # --- Styling ---
 st.markdown(
-    """
+    f"""
 <style>
-.stApp { background-color: #ffe4ec; }
-.packed-item { color: #b0b0b0; text-decoration: line-through; }
+.stApp {{ background-color: {user_config["color"]}; }}
+.packed-item {{ color: #b0b0b0; text-decoration: line-through; }}
 </style>
 """,
     unsafe_allow_html=True,
@@ -50,32 +100,34 @@ def load_json(path):
 
 
 def save_data():
-    DATA_DOC.set(data)
+    DATA_DOC.set(st.session_state.data)
 
 
-def autosave_list():
+def sync_list():
     if st.session_state.current_name:
-        data["packing_lists"][st.session_state.current_name] = st.session_state.packing_list
-        save_data()
+        st.session_state.data["packing_lists"][st.session_state.current_name] = \
+            st.session_state.packing_list
 
 
-def autosave_module():
+def sync_module():
     if st.session_state.current_module_name:
-        data["activity_modules"][st.session_state.current_module_name] = \
+        st.session_state.data["activity_modules"][st.session_state.current_module_name] = \
             st.session_state.activities[st.session_state.current_module_name]
-        save_data()
 
 
 def safe_name(name):
     return name.strip().replace("/", "_")
 
-# --- Initialize data ---
-_doc = DATA_DOC.get()
-if _doc.exists:
-    data = _doc.to_dict()
-else:
-    data = load_json(INITIAL_DATA_FILE)
-    DATA_DOC.set(data)
+# --- Initialize data (one Firestore read per session) ---
+if "data" not in st.session_state:
+    _doc = DATA_DOC.get()
+    if _doc.exists:
+        st.session_state.data = _doc.to_dict()
+    else:
+        st.session_state.data = load_json(INITIAL_DATA_FILE)
+        DATA_DOC.set(st.session_state.data)
+
+data = st.session_state.data
 defaults = data["defaults"]
 
 # --- Session state ---
@@ -83,7 +135,7 @@ for key, default in {
     "packing_list": {},
     "current_name": None,
     "confirm_delete": False,
-    "mode": "generate",  # generate, view, defaults
+    "mode": "generate",
     "activities": {},
     "current_module_name": None,
     "confirm_module_delete": False,
@@ -96,6 +148,14 @@ for key, default in {
 st.session_state.activities = data["activity_modules"]
 
 # --- Sidebar ---
+st.sidebar.markdown(f"### {user_config['icon']} {st.session_state.selected_user}")
+if st.sidebar.button("Save to cloud ☁️"):
+    save_data()
+    st.sidebar.success("Saved!")
+if st.sidebar.button("Log out"):
+    st.session_state.clear()
+    st.rerun()
+st.sidebar.markdown("---")
 st.sidebar.title("My packing lists")
 
 if st.sidebar.button("Generate new packing list"):
@@ -135,7 +195,6 @@ if st.session_state.current_name:
             data["packing_lists"][new_name] = data["packing_lists"].pop(
                 st.session_state.current_name
             )
-            save_data()
             st.session_state.current_name = new_name
             st.rerun()
 
@@ -147,7 +206,6 @@ if st.session_state.current_name:
         col1, col2 = st.sidebar.columns(2)
         if col1.button("Yes"):
             del data["packing_lists"][st.session_state.current_name]
-            save_data()
             st.session_state.packing_list = {}
             st.session_state.current_name = None
             st.session_state.confirm_delete = False
@@ -230,7 +288,6 @@ if st.session_state.mode == "create_module":
             data["activity_modules"][module_name] = list(
                 st.session_state.new_module_items
             )
-            save_data()
             st.session_state.current_module_name = module_name
             st.session_state.new_module_items = []
             st.session_state.mode = "generate"
@@ -244,7 +301,6 @@ elif st.session_state.mode == "defaults":
         col1.write(item)
         if col2.button("🗑", key=f"del_daily_{item}"):
             defaults["daily"].remove(item)
-            save_data()
             st.rerun()
 
     with st.form("add_daily_form", clear_on_submit=True):
@@ -252,7 +308,6 @@ elif st.session_state.mode == "defaults":
         if st.form_submit_button("Add nightly item"):
             if new_daily and new_daily not in defaults["daily"]:
                 defaults["daily"].append(new_daily)
-                save_data()
                 st.rerun()
 
     st.markdown("---")
@@ -263,7 +318,6 @@ elif st.session_state.mode == "defaults":
         col1.write(item)
         if col2.button("🗑", key=f"del_base_{item}"):
             defaults["base"].remove(item)
-            save_data()
             st.rerun()
 
     with st.form("add_base_form", clear_on_submit=True):
@@ -271,7 +325,6 @@ elif st.session_state.mode == "defaults":
         if st.form_submit_button("Add base item"):
             if new_base and new_base not in defaults["base"]:
                 defaults["base"].append(new_base)
-                save_data()
                 st.rerun()
 
     st.markdown("---")
@@ -282,7 +335,6 @@ elif st.session_state.mode == "defaults":
         col1.write(item)
         if col2.button("🗑", key=f"del_sleepover_{item}"):
             defaults["base_sleepover"].remove(item)
-            save_data()
             st.rerun()
 
     with st.form("add_sleepover_form", clear_on_submit=True):
@@ -292,7 +344,6 @@ elif st.session_state.mode == "defaults":
                 "base_sleepover", []
             ):
                 defaults.setdefault("base_sleepover", []).append(new_sleepover)
-                save_data()
                 st.rerun()
 
 # --- MODULE VIEW ---
@@ -315,7 +366,6 @@ elif st.session_state.current_module_name:
                 st.session_state.activities.pop(current_name)
             data["activity_modules"][new_module_name] = \
                 data["activity_modules"].pop(current_name)
-            save_data()
 
             st.session_state.current_module_name = new_module_name
 
@@ -327,7 +377,7 @@ elif st.session_state.current_module_name:
         col1.write(item)
         if col2.button("🗑", key=f"del_mod_{item}"):
             items.remove(item)
-            autosave_module()
+            sync_module()
             st.rerun()
 
     with st.form("add_to_module_form", clear_on_submit=True):
@@ -335,7 +385,7 @@ elif st.session_state.current_module_name:
         if st.form_submit_button("Add to module"):
             if new_item and new_item not in items:
                 items.append(new_item)
-                autosave_module()
+                sync_module()
                 st.rerun()
 
     st.markdown("---")
@@ -348,7 +398,6 @@ elif st.session_state.current_module_name:
         if col1.button("Yes delete module"):
             del st.session_state.activities[st.session_state.current_module_name]
             del data["activity_modules"][st.session_state.current_module_name]
-            save_data()
             st.session_state.current_module_name = None
             st.session_state.confirm_module_delete = False
             st.rerun()
@@ -387,12 +436,12 @@ else:
                 with col1:
                     if st.checkbox(item, key=f"chk_{item}"):
                         st.session_state.packing_list[item] = True
-                        autosave_list()
+                        sync_list()
                         st.rerun()
                 with col2:
                     if st.button("🗑", key=f"del_{item}"):
                         del st.session_state.packing_list[item]
-                        autosave_list()
+                        sync_list()
                         st.rerun()
 
         st.subheader("Packed")
@@ -402,11 +451,11 @@ else:
                 with col1:
                     if not st.checkbox(item, value=True, key=f"chk_packed_{item}"):
                         st.session_state.packing_list[item] = False
-                        autosave_list()
+                        sync_list()
                         st.rerun()
                 if col2.button("🗑", key=f"del_p_{item}"):
                     del st.session_state.packing_list[item]
-                    autosave_list()
+                    sync_list()
                     st.rerun()
 
         st.markdown("---")
@@ -415,7 +464,7 @@ else:
             if st.form_submit_button("Add item"):
                 if new_item:
                     st.session_state.packing_list[new_item] = False
-                    autosave_list()
+                    sync_list()
                     st.rerun()
 
         if st.session_state.mode == "generate":
@@ -425,7 +474,6 @@ else:
                 if st.form_submit_button("Save"):
                     if name:
                         data["packing_lists"][name] = st.session_state.packing_list
-                        save_data()
                         st.session_state.current_name = name
                         st.session_state.mode = "view"
                         st.success("Saved")
