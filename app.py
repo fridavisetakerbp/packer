@@ -37,7 +37,7 @@ INITIAL_DATA_FILE = "initial_data.json"
 # --- User Configuration ---
 # To add a user: add an entry here + a matching password in passwords.toml / st.secrets
 USERS = {
-    "Julianne": {"color": "#eee9e3", "icon": "🐈"},
+    "Julianne": {"color": "#eee9e3", "icon": "🐈", "accent": "#a82a39"},
     "Frida": {"color": "#c9e5e9", "icon": "🌊"},
     "Fred": {"color": "#D1C8FA", "icon": "🎮"},
 }
@@ -113,11 +113,30 @@ _dark_css = """
     color: #e0e0e0 !important;
 }
 """ if user_config.get("dark") else ""
+_accent = user_config.get("accent")
+_accent_css = f"""
+.stApp .stButton button {{
+    background-color: {_accent} !important;
+    color: #ffffff !important;
+    border-color: {_accent} !important;
+}}
+.stApp .stButton button:hover {{
+    background-color: #5a252c !important;
+    border-color: #5a252c !important;
+}}
+.stApp [data-testid="stSidebar"] .stButton button {{
+    background-color: {_accent} !important;
+}}
+.stApp [data-testid="stSidebar"] .stButton button:hover {{
+    background-color: #5a252c !important;
+}}
+""" if _accent else ""
 st.markdown(
     f"""
 <style>
 .stApp {{ background-color: {user_config["color"]}; }}
 {_dark_css}
+{_accent_css}
 .packed-item {{ color: #b0b0b0; text-decoration: line-through; }}
 </style>
 """,
