@@ -38,8 +38,8 @@ INITIAL_DATA_FILE = "initial_data.json"
 # To add a user: add an entry here + a matching password in passwords.toml / st.secrets
 USERS = {
     "Julianne": {"color": "#eee9e3", "icon": "🐈"},
-    "Frida": {"color": "#d4e8ff", "icon": "🌊"},
-    "Fred": {"color": "#460096", "icon": "🎮"},
+    "Frida": {"color": "#c9e5e9", "icon": "🌊"},
+    "Fred": {"color": "#D1C8FA", "icon": "🎮"},
 }
 
 # --- Authentication ---
@@ -81,10 +81,43 @@ user_config = USERS[st.session_state.selected_user]
 DATA_DOC = db.collection("app_data").document(st.session_state.selected_user)
 
 # --- Styling ---
+_dark_css = """
+.stApp, .stApp .stMarkdown, .stApp .stHeading, .stApp label,
+.stApp p, .stApp span, .stApp .stTextInput label,
+.stApp .stNumberInput label, .stApp .stSelectbox label {
+    color: #e0e0e0 !important;
+}
+.stApp .stButton button {
+    color: #e0e0e0 !important;
+    border-color: #e0e0e0 !important;
+    background-color: #1a1a2e !important;
+}
+.stApp .stButton button:hover {
+    background-color: #2a2a4e !important;
+    border-color: #ffffff !important;
+}
+.stApp [data-testid="stSidebar"] {
+    background-color: #35005c;
+}
+.stApp [data-testid="stSidebar"] .stButton button {
+    background-color: #2a0045 !important;
+}
+.stApp [data-testid="stSidebar"] .stButton button:hover {
+    background-color: #3d0066 !important;
+}
+.stApp input, .stApp textarea, .stApp [data-baseweb="select"] {
+    background-color: #1a1a2e !important;
+    color: #e0e0e0 !important;
+}
+.stApp .stCheckbox label span {
+    color: #e0e0e0 !important;
+}
+""" if user_config.get("dark") else ""
 st.markdown(
     f"""
 <style>
 .stApp {{ background-color: {user_config["color"]}; }}
+{_dark_css}
 .packed-item {{ color: #b0b0b0; text-decoration: line-through; }}
 </style>
 """,
@@ -205,6 +238,7 @@ if st.session_state.current_name:
         col1, col2 = st.sidebar.columns(2)
         if col1.button("Yes"):
             del data["packing_lists"][st.session_state.current_name]
+            save_data()
             st.session_state.packing_list = {}
             st.session_state.current_name = None
             st.session_state.confirm_delete = False
