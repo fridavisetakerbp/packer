@@ -1,20 +1,14 @@
 import json
 import os
+import shutil
 
 import streamlit as st
 
 # --- Config ---
 st.set_page_config(page_title="Packing List", layout="centered")
 
-SAVE_LIST_DIR = "packing_lists"
-SAVE_MODULE_DIR = "activity_modules"
-DEFAULTS_FILE = "defaults.json"
-INITIAL_LISTS_DIR = "initial_lists"
-INITIAL_MODULE_DIR = "initial_modules"
-INITIAL_DEFAULTS_FILE = "initial_defaults.json"
-
-os.makedirs(SAVE_LIST_DIR, exist_ok=True)
-os.makedirs(SAVE_MODULE_DIR, exist_ok=True)
+DATA_FILE = "data.json"
+INITIAL_DATA_FILE = "initial_data.json"
 
 # --- Styling ---
 st.markdown(
@@ -29,61 +23,46 @@ st.markdown(
 
 
 # --- Helpers ---
-def save_json(path, data):
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
-
-
 def load_json(path):
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def list_saved(path):
-    return sorted([f for f in os.listdir(path) if f.endswith(".json")])
+def save_data():
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
 
 def autosave_list():
-    if st.session_state.current_file:
-        name = st.session_state.current_file.replace(".json", "")
-        save_json(
-            os.path.join(SAVE_LIST_DIR, f"{name}.json"), st.session_state.packing_list
-        )
+    if st.session_state.current_name:
+        data["packing_lists"][st.session_state.current_name] = st.session_state.packing_list
+        save_data()
 
 
 def autosave_module():
-    if st.session_state.current_module_file:
-        name = st.session_state.current_module_file.replace(".json", "")
-        save_json(
-            os.path.join(SAVE_MODULE_DIR, f"{name}.json"),
-            st.session_state.activities[st.session_state.current_module_name],
-        )
+    if st.session_state.current_module_name:
+        data["activity_modules"][st.session_state.current_module_name] = \
+            st.session_state.activities[st.session_state.current_module_name]
+        save_data()
 
-def rename_file(old_path, new_path):
-    if os.path.exists(old_path):
-        os.rename(old_path, new_path)
 
 def safe_name(name):
     return name.strip().replace("/", "_")
 
-# --- Initialize defaults ---
-if not os.path.exists(DEFAULTS_FILE):
-    save_json(
-        DEFAULTS_FILE,
-        load_json(os.path.join(INITIAL_DEFAULTS_FILE)),
-    )
+# --- Initialize data ---
+if not os.path.exists(DATA_FILE):
+    shutil.copy2(INITIAL_DATA_FILE, DATA_FILE)
 
-defaults = load_json(DEFAULTS_FILE)
+data = load_json(DATA_FILE)
+defaults = data["defaults"]
 
 # --- Session state ---
 for key, default in {
     "packing_list": {},
-    "current_file": None,
     "current_name": None,
     "confirm_delete": False,
     "mode": "generate",  # generate, view, defaults
     "activities": {},
-    "current_module_file": None,
     "current_module_name": None,
     "confirm_module_delete": False,
     "new_module_items": [],
@@ -91,51 +70,33 @@ for key, default in {
     if key not in st.session_state:
         st.session_state[key] = default
 
-# --- Default modules ---
-INITIAL_MODULES = {}
-for f in list_saved(INITIAL_MODULE_DIR):
-    name = f.replace(".json", "")
-    INITIAL_MODULES[name] = load_json(os.path.join(INITIAL_MODULE_DIR, f))
-
-if not os.listdir(SAVE_MODULE_DIR):
-    for k, v in INITIAL_MODULES.items():
-        save_json(os.path.join(SAVE_MODULE_DIR, f"{k}.json"), v)
-
 # Load modules
-st.session_state.activities = {}
-for f in list_saved(SAVE_MODULE_DIR):
-    name = f.replace(".json", "")
-    st.session_state.activities[name] = load_json(os.path.join(SAVE_MODULE_DIR, f))
+st.session_state.activities = data["activity_modules"]
 
 # --- Sidebar ---
 st.sidebar.title("My packing lists")
 
 if st.sidebar.button("Generate new packing list"):
     st.session_state.mode = "generate"
-    st.session_state.current_file = None
     st.session_state.current_name = None
     st.session_state.packing_list = {}
     st.session_state.current_module_name = None
-    st.session_state.current_module_file = None
     st.session_state.new_module_items = []
     st.rerun()
 
 st.sidebar.markdown("### Existing lists")
 
-for file in list_saved(SAVE_LIST_DIR):
-    clean_name = file.replace(".json", "")
-    if st.sidebar.button(clean_name, key=f"load_list_{file}"):
-        st.session_state.packing_list = load_json(os.path.join(SAVE_LIST_DIR, file))
-        st.session_state.current_file = file
-        st.session_state.current_name = clean_name
+for name in sorted(data["packing_lists"]):
+    if st.sidebar.button(name, key=f"load_list_{name}"):
+        st.session_state.packing_list = data["packing_lists"][name]
+        st.session_state.current_name = name
         st.session_state.mode = "view"
         st.session_state.current_module_name = None
-        st.session_state.current_module_file = None
         st.session_state.new_module_items = []
         st.rerun()
 
 # Delete list
-if st.session_state.current_file:
+if st.session_state.current_name:
     st.sidebar.markdown("---")
     st.sidebar.write(f"Selected: {st.session_state.current_name}")
 
@@ -145,17 +106,14 @@ if st.session_state.current_file:
 
     if st.sidebar.button("Rename list"):
         new_name = safe_name(new_name)
-        new_file = f"{new_name}.json"
 
-        if new_file in list_saved(SAVE_LIST_DIR):
+        if new_name in data["packing_lists"]:
             st.sidebar.error("Name already exists")
         elif new_name != st.session_state.current_name:
-            old_path = os.path.join(SAVE_LIST_DIR, st.session_state.current_file)
-            new_path = os.path.join(SAVE_LIST_DIR, new_file)
-
-            rename_file(old_path, new_path)
-
-            st.session_state.current_file = new_file
+            data["packing_lists"][new_name] = data["packing_lists"].pop(
+                st.session_state.current_name
+            )
+            save_data()
             st.session_state.current_name = new_name
             st.rerun()
 
@@ -166,9 +124,9 @@ if st.session_state.current_file:
         st.sidebar.warning("Are you sure you want to delete this packing list?")
         col1, col2 = st.sidebar.columns(2)
         if col1.button("Yes"):
-            os.remove(os.path.join(SAVE_LIST_DIR, st.session_state.current_file))
+            del data["packing_lists"][st.session_state.current_name]
+            save_data()
             st.session_state.packing_list = {}
-            st.session_state.current_file = None
             st.session_state.current_name = None
             st.session_state.confirm_delete = False
             st.session_state.mode = "generate"
@@ -183,8 +141,6 @@ st.sidebar.title("My activities")
 if st.sidebar.button("Create new module"):
     st.session_state.mode = "create_module"
     st.session_state.current_module_name = None
-    st.session_state.current_module_file = None
-    st.session_state.current_file = None
     st.session_state.current_name = None
     st.session_state.new_module_items = []
     st.rerun()
@@ -192,8 +148,6 @@ if st.sidebar.button("Create new module"):
 for module in st.session_state.activities:
     if st.sidebar.button(module, key=f"mod_{module}"):
         st.session_state.current_module_name = module
-        st.session_state.current_module_file = f"{module}.json"
-        st.session_state.current_file = None
         st.session_state.current_name = None
         st.session_state.mode = "generate"
         st.session_state.new_module_items = []
@@ -205,7 +159,7 @@ st.sidebar.title("Defaults")
 
 if st.sidebar.button("Edit default items"):
     st.session_state.mode = "defaults"
-    st.session_state.current_file = None
+    st.session_state.current_name = None
     st.session_state.current_module_name = None
     st.session_state.new_module_items = []
     st.rerun()
@@ -251,12 +205,11 @@ if st.session_state.mode == "create_module":
             st.session_state.activities[module_name] = list(
                 st.session_state.new_module_items
             )
-            save_json(
-                os.path.join(SAVE_MODULE_DIR, f"{module_name}.json"),
-                st.session_state.new_module_items,
+            data["activity_modules"][module_name] = list(
+                st.session_state.new_module_items
             )
+            save_data()
             st.session_state.current_module_name = module_name
-            st.session_state.current_module_file = f"{module_name}.json"
             st.session_state.new_module_items = []
             st.session_state.mode = "generate"
             st.rerun()
@@ -269,7 +222,7 @@ elif st.session_state.mode == "defaults":
         col1.write(item)
         if col2.button("🗑", key=f"del_daily_{item}"):
             defaults["daily"].remove(item)
-            save_json(DEFAULTS_FILE, defaults)
+            save_data()
             st.rerun()
 
     with st.form("add_daily_form", clear_on_submit=True):
@@ -277,7 +230,7 @@ elif st.session_state.mode == "defaults":
         if st.form_submit_button("Add nightly item"):
             if new_daily and new_daily not in defaults["daily"]:
                 defaults["daily"].append(new_daily)
-                save_json(DEFAULTS_FILE, defaults)
+                save_data()
                 st.rerun()
 
     st.markdown("---")
@@ -288,7 +241,7 @@ elif st.session_state.mode == "defaults":
         col1.write(item)
         if col2.button("🗑", key=f"del_base_{item}"):
             defaults["base"].remove(item)
-            save_json(DEFAULTS_FILE, defaults)
+            save_data()
             st.rerun()
 
     with st.form("add_base_form", clear_on_submit=True):
@@ -296,7 +249,7 @@ elif st.session_state.mode == "defaults":
         if st.form_submit_button("Add base item"):
             if new_base and new_base not in defaults["base"]:
                 defaults["base"].append(new_base)
-                save_json(DEFAULTS_FILE, defaults)
+                save_data()
                 st.rerun()
 
     st.markdown("---")
@@ -307,7 +260,7 @@ elif st.session_state.mode == "defaults":
         col1.write(item)
         if col2.button("🗑", key=f"del_sleepover_{item}"):
             defaults["base_sleepover"].remove(item)
-            save_json(DEFAULTS_FILE, defaults)
+            save_data()
             st.rerun()
 
     with st.form("add_sleepover_form", clear_on_submit=True):
@@ -317,7 +270,7 @@ elif st.session_state.mode == "defaults":
                 "base_sleepover", []
             ):
                 defaults.setdefault("base_sleepover", []).append(new_sleepover)
-                save_json(DEFAULTS_FILE, defaults)
+                save_data()
                 st.rerun()
 
 # --- MODULE VIEW ---
@@ -336,18 +289,13 @@ elif st.session_state.current_module_name:
         if new_module_name in st.session_state.activities:
             st.error("Module already exists")
         elif new_module_name != current_name:
-            old_file = os.path.join(SAVE_MODULE_DIR, f"{current_name}.json")
-            new_file = os.path.join(SAVE_MODULE_DIR, f"{new_module_name}.json")
-
-            rename_file(old_file, new_file)
-
-            # rename dict key
             st.session_state.activities[new_module_name] = \
                 st.session_state.activities.pop(current_name)
+            data["activity_modules"][new_module_name] = \
+                data["activity_modules"].pop(current_name)
+            save_data()
 
-            # update session refs
             st.session_state.current_module_name = new_module_name
-            st.session_state.current_module_file = f"{new_module_name}.json"
 
             st.rerun()
 
@@ -376,12 +324,10 @@ elif st.session_state.current_module_name:
         st.warning("Are you sure you want to delete this module?")
         col1, col2 = st.columns(2)
         if col1.button("Yes delete module"):
-            os.remove(
-                os.path.join(SAVE_MODULE_DIR, st.session_state.current_module_file)
-            )
             del st.session_state.activities[st.session_state.current_module_name]
+            del data["activity_modules"][st.session_state.current_module_name]
+            save_data()
             st.session_state.current_module_name = None
-            st.session_state.current_module_file = None
             st.session_state.confirm_module_delete = False
             st.rerun()
         if col2.button("Cancel"):
@@ -456,11 +402,8 @@ else:
                 name = st.text_input("Save as")
                 if st.form_submit_button("Save"):
                     if name:
-                        save_json(
-                            os.path.join(SAVE_LIST_DIR, f"{name}.json"),
-                            st.session_state.packing_list,
-                        )
-                        st.session_state.current_file = f"{name}.json"
+                        data["packing_lists"][name] = st.session_state.packing_list
+                        save_data()
                         st.session_state.current_name = name
                         st.session_state.mode = "view"
                         st.success("Saved")
