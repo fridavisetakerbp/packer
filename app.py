@@ -1,6 +1,5 @@
 import json
 import os
-import shutil
 
 import streamlit as st
 import firebase_admin
@@ -29,8 +28,8 @@ db = firestore.client()
 # --- Config ---
 st.set_page_config(page_title="Packing List", layout="centered")
 
-DATA_FILE = "data.json"
 INITIAL_DATA_FILE = "initial_data.json"
+DATA_DOC = db.collection("app_data").document("user_data")
 
 # --- Styling ---
 st.markdown(
@@ -51,8 +50,7 @@ def load_json(path):
 
 
 def save_data():
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    DATA_DOC.set(data)
 
 
 def autosave_list():
@@ -72,10 +70,12 @@ def safe_name(name):
     return name.strip().replace("/", "_")
 
 # --- Initialize data ---
-if not os.path.exists(DATA_FILE):
-    shutil.copy2(INITIAL_DATA_FILE, DATA_FILE)
-
-data = load_json(DATA_FILE)
+_doc = DATA_DOC.get()
+if _doc.exists:
+    data = _doc.to_dict()
+else:
+    data = load_json(INITIAL_DATA_FILE)
+    DATA_DOC.set(data)
 defaults = data["defaults"]
 
 # --- Session state ---
