@@ -38,8 +38,8 @@ INITIAL_DATA_FILE = "initial_data.json"
 # To add a user: add an entry here + a matching password in passwords.toml / st.secrets
 USERS = {
     "Julianne": {"color": "#eee9e3", "icon": "🐈", "accent": "#a82a39"},
-    "Frida": {"color": "#c9e5e9", "icon": "🌊"},
-    "Fred": {"color": "#D1C8FA", "icon": "🎮"},
+    "Frida": {"color": "#c9e5e9", "icon": "🌊", "accent": "#ffeab0"},
+    "Fred": {"color": "#D1C8FA", "icon": "🎮", "accent": "#f57926"},
 }
 
 # --- Authentication ---
@@ -114,23 +114,29 @@ _dark_css = """
 }
 """ if user_config.get("dark") else ""
 _accent = user_config.get("accent")
-_accent_css = f"""
+if _accent:
+    _r, _g, _b = int(_accent[1:3], 16), int(_accent[3:5], 16), int(_accent[5:7], 16)
+    _text_color = "#000000" if (_r * 0.299 + _g * 0.587 + _b * 0.114) > 150 else "#ffffff"
+    _hover = f"#{max(_r-25,0):02x}{max(_g-25,0):02x}{max(_b-25,0):02x}"
+    _accent_css = f"""
 .stApp .stButton button {{
     background-color: {_accent} !important;
-    color: #ffffff !important;
+    color: {_text_color} !important;
     border-color: {_accent} !important;
 }}
 .stApp .stButton button:hover {{
-    background-color: #5a252c !important;
-    border-color: #5a252c !important;
+    background-color: {_hover} !important;
+    border-color: {_hover} !important;
 }}
 .stApp [data-testid="stSidebar"] .stButton button {{
     background-color: {_accent} !important;
 }}
 .stApp [data-testid="stSidebar"] .stButton button:hover {{
-    background-color: #5a252c !important;
+    background-color: {_hover} !important;
 }}
-""" if _accent else ""
+"""
+else:
+    _accent_css = ""
 st.markdown(
     f"""
 <style>
@@ -450,6 +456,7 @@ elif st.session_state.current_module_name:
         col1, col2 = st.columns(2)
         if col1.button("Yes delete module"):
             del data["activity_modules"][st.session_state.current_module_name]
+            save_data()
             st.session_state.current_module_name = None
             st.session_state.confirm_module_delete = False
             st.rerun()
