@@ -395,7 +395,6 @@ elif st.session_state.current_module_name:
         st.warning("Are you sure you want to delete this module?")
         col1, col2 = st.columns(2)
         if col1.button("Yes delete module"):
-            del st.session_state.activities[st.session_state.current_module_name]
             del data["activity_modules"][st.session_state.current_module_name]
             st.session_state.current_module_name = None
             st.session_state.confirm_module_delete = False
