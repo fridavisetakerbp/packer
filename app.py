@@ -40,6 +40,7 @@ USERS = {
     "Julianne": {"color": "#eee9e3", "icon": "🐈", "accent": "#a82a39"},
     "Frida": {"color": "#c9e5e9", "icon": "🌊", "accent": "#ffeab0"},
     "Fred": {"color": "#D1C8FA", "icon": "🎮", "accent": "#f57926"},
+    "Diletta": {"color": "#FFFFFF", "icon": "🌠", "accent": "#000000"},
 }
 
 # --- Authentication ---
