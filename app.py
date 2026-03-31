@@ -3,6 +3,27 @@ import os
 import shutil
 
 import streamlit as st
+import firebase_admin
+from firebase_admin import credentials, firestore
+
+def get_firebase_cred():
+    # Case 1: Running on Streamlit Cloud
+    if "firebase" in st.secrets:
+        return credentials.Certificate(dict(st.secrets["firebase"]))
+    
+    # Case 2: Local development
+    elif os.path.exists("cloud_credentials.json"):
+        return credentials.Certificate("cloud_credentials.json")
+    
+    else:
+        raise RuntimeError("No Firebase credentials found")
+
+# --- Firebase Setup ---
+if not firebase_admin._apps:  # check if Firebase app is already initialized
+    cred = get_firebase_cred()
+    firebase_admin.initialize_app(cred)
+    
+db = firestore.client()
 
 # --- Config ---
 st.set_page_config(page_title="Packing List", layout="centered")
