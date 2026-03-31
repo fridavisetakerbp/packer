@@ -7,13 +7,14 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 def get_firebase_cred():
+
+    # Case 2: Local development
+    if os.path.exists(r"C:\Users\frivis\OneDrive - Aker BP\Documents\Projects\packing_app\packer\cloud_credentials.json"):
+        return credentials.Certificate("cloud_credentials.json")
+
     # Case 1: Running on Streamlit Cloud
     if "firebase" in st.secrets:
         return credentials.Certificate(dict(st.secrets["firebase"]))
-    
-    # Case 2: Local development
-    elif os.path.exists("cloud_credentials.json"):
-        return credentials.Certificate("cloud_credentials.json")
     
     else:
         raise RuntimeError("No Firebase credentials found")
