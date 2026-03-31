@@ -424,8 +424,6 @@ elif st.session_state.current_module_name:
         elif new_module_name != current_name:
             st.session_state.activities[new_module_name] = \
                 st.session_state.activities.pop(current_name)
-            data["activity_modules"][new_module_name] = \
-                data["activity_modules"].pop(current_name)
 
             st.session_state.current_module_name = new_module_name
 
