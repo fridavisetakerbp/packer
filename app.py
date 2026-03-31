@@ -287,6 +287,7 @@ if st.session_state.mode == "create_module":
             data["activity_modules"][module_name] = list(
                 st.session_state.new_module_items
             )
+            save_data()
             st.session_state.current_module_name = module_name
             st.session_state.new_module_items = []
             st.session_state.mode = "generate"
@@ -472,6 +473,7 @@ else:
                 if st.form_submit_button("Save"):
                     if name:
                         data["packing_lists"][name] = st.session_state.packing_list
+                        save_data()
                         st.session_state.current_name = name
                         st.session_state.mode = "view"
                         st.success("Saved")
