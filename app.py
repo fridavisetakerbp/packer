@@ -37,10 +37,9 @@ INITIAL_DATA_FILE = "initial_data.json"
 # --- User Configuration ---
 # To add a user: add an entry here + a matching password in passwords.toml / st.secrets
 USERS = {
-    "Alice": {"color": "#ffe4ec", "icon": "🎀"},
-    "Bob": {"color": "#d4e8ff", "icon": "🌊"},
-    "Charlie": {"color": "#d4f5d4", "icon": "🌿"},
-    "Diana": {"color": "#fff0d4", "icon": "🌅"},
+    "Julianne": {"color": "#eee9e3", "icon": "🐈"},
+    "Frida": {"color": "#d4e8ff", "icon": "🌊"},
+    "Fred": {"color": "#460096", "icon": "🎮"},
 }
 
 # --- Authentication ---
